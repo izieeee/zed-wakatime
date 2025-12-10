@@ -147,21 +147,11 @@ impl WakatimeExtension {
     fn language_server_binary_path(
         &mut self,
         language_server_id: &LanguageServerId,
-        worktree: &Worktree,
     ) -> Result<PathBuf, String> {
         zed::set_language_server_installation_status(
             language_server_id,
             &zed::LanguageServerInstallationStatus::CheckingForUpdate,
         );
-
-        if let Some(path) = worktree.which(&executable_name("wakatime-ls")) {
-            return Ok(path.into());
-        }
-
-        let target_triple = self.target_triple("wakatime-ls")?;
-        if let Some(path) = worktree.which(&executable_name(&target_triple)) {
-            return Ok(path.into());
-        }
 
         if let Some(path) = &self.cached_ls_binary_path {
             if fs::metadata(path).is_ok_and(|stat| stat.is_file()) {
@@ -222,7 +212,7 @@ impl zed::Extension for WakatimeExtension {
         let wakatime_cli_binary_path =
             self.wakatime_cli_binary_path(language_server_id, worktree)?;
 
-        let ls_binary_path = self.language_server_binary_path(language_server_id, worktree)?;
+        let ls_binary_path = self.language_server_binary_path(language_server_id)?;
 
         let args = vec!["--wakatime-cli".to_string(), {
             use std::env;
