@@ -51,6 +51,13 @@ fn executable_name(binary: &str) -> String {
     }
 }
 
+fn project_name_from_path(path: &str) -> Option<String> {
+    Path::new(path)
+        .file_name()
+        .and_then(|file_name| file_name.to_str())
+        .map(ToString::to_string)
+}
+
 impl WakatimeExtension {
     fn target_triple(&self, binary: &str) -> Result<String, String> {
         let (platform, arch) = zed::current_platform();
@@ -213,7 +220,7 @@ impl zed::Extension for WakatimeExtension {
 
         let ls_binary_path = self.language_server_binary_path(language_server_id)?;
 
-        let args = vec!["--wakatime-cli".to_string(), {
+        let mut args = vec!["--wakatime-cli".to_string(), {
             use std::env;
             let current = env::current_dir().unwrap();
             let waka_cli = if is_absolute_path_wasm(&wakatime_cli_binary_path) {
@@ -227,6 +234,19 @@ impl zed::Extension for WakatimeExtension {
             };
             sanitize_path(waka_cli.as_str())
         }];
+
+        let project_folder = sanitize_path(worktree.root_path().as_str());
+        if !project_folder.is_empty() {
+            args.push("--project-folder".to_string());
+            args.push(project_folder.clone());
+
+            if let Some(project_name) = project_name_from_path(project_folder.as_str()) {
+                if !project_name.is_empty() {
+                    args.push("--alternate-project".to_string());
+                    args.push(project_name);
+                }
+            }
+        }
 
         Ok(Command {
             args,
