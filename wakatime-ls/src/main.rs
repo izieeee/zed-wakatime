@@ -33,6 +33,8 @@ struct WakatimeLanguageServer {
     client: Client,
     settings: ArcSwap<Settings>,
     wakatime_path: String,
+    project_folder: String,
+    alternate_project: String,
     current_file: Mutex<CurrentFile>,
     platform: ArcSwap<String>,
 }
@@ -81,6 +83,18 @@ impl WakatimeLanguageServer {
             .arg(event.is_write.to_string())
             .arg("--entity")
             .arg(event.uri.as_str());
+
+        if !self.project_folder.is_empty() {
+            command
+                .arg("--project-folder")
+                .arg(self.project_folder.as_str());
+        }
+
+        if !self.alternate_project.is_empty() {
+            command
+                .arg("--alternate-project")
+                .arg(self.alternate_project.as_str());
+        }
 
         if !self.platform.load().is_empty() {
             command.arg("--plugin").arg(self.platform.load().as_str());
@@ -265,12 +279,34 @@ async fn main() {
                 .help("wakatime-cli path")
                 .required(true),
         )
+        .arg(
+            Arg::new("project-folder")
+                .long("project-folder")
+                .help("project folder path"),
+        )
+        .arg(
+            Arg::new("alternate-project")
+                .long("alternate-project")
+                .help("alternate project name"),
+        )
         .get_matches();
 
     let wakatime_cli = if let Some(s) = matches.get_one::<String>("wakatime-cli") {
         s.to_string()
     } else {
         "wakatime-cli".to_string()
+    };
+
+    let project_folder = if let Some(s) = matches.get_one::<String>("project-folder") {
+        s.to_string()
+    } else {
+        String::new()
+    };
+
+    let alternate_project = if let Some(s) = matches.get_one::<String>("alternate-project") {
+        s.to_string()
+    } else {
+        String::new()
     };
 
     let stdin = tokio::io::stdin();
@@ -281,6 +317,8 @@ async fn main() {
             client,
             settings: ArcSwap::from_pointee(Settings::default()),
             wakatime_path: wakatime_cli,
+            project_folder,
+            alternate_project,
             platform: ArcSwap::from_pointee(String::new()),
             current_file: Mutex::new(CurrentFile {
                 uri: String::new(),
