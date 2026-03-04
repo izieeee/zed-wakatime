@@ -3,11 +3,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use zed_extension_api::{self as zed, Command, LanguageServerId, Result, Worktree};
+use zed_extension_api::{self as zed, Command, LanguageServerId, Result, StatusBarItem, Worktree, Workspace};
 
 struct WakatimeExtension {
     cached_ls_binary_path: Option<PathBuf>,
     cached_wakatime_cli_binary_path: Option<PathBuf>,
+    status_bar_item: Option<StatusBarItem>,
 }
 
 fn is_absolute_path_wasm(path: &PathBuf) -> bool {
@@ -200,6 +201,40 @@ impl WakatimeExtension {
 
         Ok(binary_path)
     }
+
+    fn get_workspace_info(&self, workspace: &Workspace) {
+        let worktrees = workspace.worktrees();
+        for worktree in worktrees {
+            let root = worktree.root_path();
+            // Use worktree info to display coding time in status bar or perform other operations
+            let _ = root;
+        }
+    }
+
+    fn update_status_bar(&mut self, workspace: &Workspace) {
+        if let Some(ref mut status_bar) = self.status_bar_item {
+            let worktrees = workspace.worktrees();
+            let mut total_time = String::from("WakaTime: calculating...");
+
+            for worktree in worktrees {
+                if let Some(ref cli_path) = self.cached_wakatime_cli_binary_path {
+                    if let Ok(output) = std::process::Command::new(cli_path)
+                        .arg("--today")
+                        .env("WAKATIME_HOME", worktree.root_path())
+                        .output()
+                    {
+                        if let Ok(time_str) = String::from_utf8(output.stdout) {
+                            total_time = format!("WakaTime: {}", time_str.trim());
+                            break;
+                        }
+                    }
+                }
+            }
+
+            status_bar.set_label(total_time);
+            status_bar.set_tooltip("WakaTime – today's coding time".to_string());
+        }
+    }
 }
 
 impl zed::Extension for WakatimeExtension {
@@ -207,6 +242,7 @@ impl zed::Extension for WakatimeExtension {
         Self {
             cached_ls_binary_path: None,
             cached_wakatime_cli_binary_path: None,
+            status_bar_item: None,
         }
     }
 
@@ -253,6 +289,18 @@ impl zed::Extension for WakatimeExtension {
             command: ls_binary_path.to_str().unwrap().to_owned(),
             env: worktree.shell_env(),
         })
+    }
+
+    fn workspace_updated(&mut self, workspace: &Workspace) {
+        self.get_workspace_info(workspace);
+        
+        // Initialize status bar on first workspace update
+        if self.status_bar_item.is_none() {
+            self.status_bar_item = Some(zed::create_status_bar_item());
+        }
+        
+        // Update the status bar immediately
+        self.update_status_bar(workspace);
     }
 }
 
