@@ -4,7 +4,7 @@ version.workspace = true
 edition = "2021"
 
 [dependencies]
-zed_extension_api = "0.7.0"
+zed_extension_api = { git = "https://github.com/izieeee/zed", branch = "main" }
 
 [lib]
 name = "zed_wakatime"
